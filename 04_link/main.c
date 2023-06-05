@@ -40,12 +40,14 @@ void walk(node *head) {
 
 node * remove_if_v1(node * head)  
 {  
-    for (node * prev = NULL, * curr = head; curr != NULL; )  
+    node *prev=NULL, *next=NULL, *curr = NULL;
+
+    for (curr = head; curr != NULL; )  
     {  
-        node * next = curr->next;  
+        next = curr->next;  
         if (curr->val == 5)
         {  
-            if (prev)  
+            if (prev)
                 prev->next = curr->next;  
             else  
                 head = curr->next;  
@@ -58,11 +60,14 @@ node * remove_if_v1(node * head)
     return head;  
 } 
 
-void remove_if_v2(node ** head)  
+void remove_if_v2(node** head)  
 {  
-    for (node** curr = head; *curr; )  
+    node** curr = NULL;
+    node* entry = NULL;
+
+    for (curr = head; *curr; )  
     {  
-        node * entry = *curr;  
+        entry = *curr;  
         if (entry->val  == 5)  
         {  
             *curr = entry->next;  
@@ -78,9 +83,9 @@ int main()
     node *head = NULL;
     head = init();
     walk(head);
-    // remove_if_v1(head);
-    remove_if_v2(&head);
-    printf("--------------------------------");
+    remove_if_v1(head);
+    // remove_if_v2(&head);
+    printf("--------------------------------\n");
     walk(head);
     return 0;
 }
