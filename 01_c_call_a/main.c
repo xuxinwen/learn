@@ -7,7 +7,7 @@ push %rbp
 mov %rsp, %rbp
 
 rax
-
+1
 mov %rbp, %rsp
 pop %rbp
 ret
