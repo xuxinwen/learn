@@ -9,6 +9,28 @@
 
 #define _selector(index, ti, rpl) ((index) << 3 | (ti) | (rpl))
 
+#define BIT_GRANULARITY 0x80000000000000
+#define BIT_BIG 0x40000000000000
+#define BIT_DEFAULT 0x40000000000000
+#define BIT_AVAILABLE 0x10000000000000
+#define BIT_PRESENT 0x800000000000
+#define BIT_EXPAND_DOWN 0x40000000000
+#define BIT_WRITABLE 0x20000000000
+#define BIT_ACCESSED 0x10000000000
+#define BIT_READABLE 0x20000000000
+#define BIT_CONFORMING 0x40000000000
+
+#define BIT_TYPE4 0x1000
+
+#define _descriptor(base, limit, dpl, fields) (\
+    (((long long)(base) & 0xff000000) << 32) | \
+    (((long long)(base) & 0x00ff0000) << 16) | \
+    (((long long)(base) & 0x0000ffff) << 16) | \
+    ((long long)(limit) & 0x0000ffff) | \
+    ((long long)(limit) & 0xf0000) << 32 | \
+    (long long)fields \
+) 
+
 SCRN_SEL	= _selector(3, GDT_TI, PL0)
 TSS0_SEL	= _selector(4, GDT_TI, PL0)
 LDT0_SEL	= _selector(5, GDT_TI, PL0)
