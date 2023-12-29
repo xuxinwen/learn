@@ -7,24 +7,31 @@
 # head.s contains the 32-bit startup code.
 # Two L3 task multitasking. The code of tasks are in kernel area,
 # just like the Linux. The kernel code is located at 0x10000.
-# 12 "head.S"
+
+# 1 "i386.h" 1
+# 6 "head.S" 2
+# 1 "8253.h" 1
+# 7 "head.S" 2
+
+CODE_SEL = ((1) << 3 | (0b000) | (0b00))
+DATA_SEL = ((2) << 3 | (0b000) | (0b00))
 SCRN_SEL = ((3) << 3 | (0b000) | (0b00))
 TSS0_SEL = ((4) << 3 | (0b000) | (0b00))
-LDT0_SEL = 0x28
-TSS1_SEL = 0X30
-LDT1_SEL = 0x38
+LDT0_SEL = ((5) << 3 | (0b000) | (0b00))
+TSS1_SEL = ((6) << 3 | (0b000) | (0b00))
+LDT1_SEL = ((7) << 3 | (0b000) | (0b00))
+
 .global startup_32
 .text
 startup_32:
- movl $0x10,%eax
+ movl DATA_SEL,%eax
  mov %ax,%ds
-# mov %ax,%es
  lss init_stack,%esp
 
 # setup base fields of descriptors.
  call setup_idt
  call setup_gdt
- movl $0x10,%eax # reload all the segment registers
+ movl DATA_SEL,%eax # reload all the segment registers
  mov %ax,%ds # after changing gdt.
  mov %ax,%es
  mov %ax,%fs
@@ -32,7 +39,7 @@ startup_32:
  lss init_stack,%esp
 
 # setup up timer 8253 chip.
- movb $0x36, %al
+ movb $(0x00|0x30|0x6|0), %al
  movl $0x43, %edx
  outb %al, %dx
  movl $11930, %eax # timer frequency 100 HZ
@@ -42,7 +49,7 @@ startup_32:
  outb %al, %dx
 
 # setup timer & system call interrupt descriptors.
- movl $0x00080000, %eax
+ movl $(CODE_SEL<<16), %eax
  movw $timer_interrupt, %ax
  movw $0x8E00, %dx
  movl $0x08, %ecx # The PC default timer int.
@@ -190,19 +197,40 @@ lgdt_opcode:
 idt: .fill 256,8,0 # idt is uninitialized
 
 gdt: .quad 0x0000000000000000
- .quad 0x00c09a00000007ff
- .quad 0x00c09200000007ff
- .quad 0x00c0920b80000002
+ .quad ( (((0) & 0xff000000) << 32) | (((0) & 0x00ff0000) << 16) | (((0) & 0x0000ffff) << 16) | ((0x7ff) & 0x0000ffff) | ((0x7ff) & 0xf0000) << 32 | ((( 0b11 << 43) | 0x20000000000 | 0x80000000000000 | 0x40000000000000 | 0x800000000000)) )
 
- .word 0x0068, tss0, 0xe900, 0x0 # TSS0 descr 0x20
- .word 0x0040, ldt0, 0xe200, 0x0 # LDT0 descr 0x28
- .word 0x0068, tss1, 0xe900, 0x0 # TSS1 descr 0x30
- .word 0x0040, ldt1, 0xe200, 0x0 # LDT1 descr 0x38
+
+
+ .quad ( (((0) & 0xff000000) << 32) | (((0) & 0x00ff0000) << 16) | (((0) & 0x0000ffff) << 16) | ((0x7ff) & 0x0000ffff) | ((0x7ff) & 0xf0000) << 32 | ((( 0b10 << 43) | 0x20000000000 | 0x80000000000000 | 0x40000000000000 | 0x800000000000)) )
+
+
+
+ .quad ( (((0xb8000) & 0xff000000) << 32) | (((0xb8000) & 0x00ff0000) << 16) | (((0xb8000) & 0x0000ffff) << 16) | ((0x2) & 0x0000ffff) | ((0x2) & 0xf0000) << 32 | ((( 0b10 << 43) | 0x20000000000 | 0x80000000000000 | 0x40000000000000 | 0x800000000000)) )
+
+
+
+
+ .word ( (0x68) & 0x0000ffff), (tss0), ((((( 0b1001 << 40)|0x800000000000))>>32) & 0xff00), ((( 0b1001 << 40)|0x800000000000))>>48 # .word 0x0068, tss0, 0xe900, 0x0
+
+
+
+ .word ( (0x40) & 0x0000ffff), (ldt0), ((((0x800000000000|( 0B10 << 40)))>>32) & 0xff00), ((0x800000000000|( 0B10 << 40)))>>48 # .word 0x0040, ldt0, 0xe200, 0x0 # LDT0 descr 0x28
+
+
+
+ .word ( (0x68) & 0x0000ffff), (tss1), ((((0x800000000000|( 0b1001 << 40)))>>32) & 0xff00), ((0x800000000000|( 0b1001 << 40)))>>48 # .word 0x0068, tss1, 0xe900, 0x0 # TSS1 descr 0x30
+
+
+
+ .word ( (0x40) & 0x0000ffff), (ldt1), ((((0x800000000000|( 0B10 << 40)))>>32) & 0xff00), ((0x800000000000|( 0B10 << 40)))>>48 # .word 0x0040, ldt1, 0xe200, 0x0 # LDT1 descr 0x38
+
+
+
 end_gdt:
  .fill 128,4,0
 init_stack: # Will be used as user stack for task0.
  .long init_stack
- .word 0x10
+ .word ((2) << 3 | (0b000) | (0b00))
 
 
 .align 8
@@ -229,7 +257,7 @@ ldt1: .quad 0x0000000000000000
  .quad 0x00c0f200000003ff # 0x17
 
 tss1: .long 0
- .long krn_stk1, 0x10
+ .long krn_stk1, ((2) << 3 | (0b000) | (0b00))
  .long 0, 0, 0, 0, 0
  .long task1, 0x200
  .long 0, 0, 0, 0

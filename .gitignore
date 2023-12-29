@@ -1,2 +1,10 @@
 .vscode/
 a.out
+Image
+System.map
+bochsout.txt
+boot
+head
+system
+*.o
+head.s
