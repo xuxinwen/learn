@@ -2,35 +2,11 @@
 #  Two L3 task multitasking. The code of tasks are in kernel area, 
 #  just like the Linux. The kernel code is located at 0x10000. 
 
-#define PL0 0b00
-#define PL3 0b11
-#define LDT_TI 0b100
-#define GDT_TI 0b000
+#include "i386.h"
+#include "8253.h"
 
-#define _selector(index, ti, rpl) ((index) << 3 | (ti) | (rpl))
-
-#define BIT_GRANULARITY 0x80000000000000
-#define BIT_BIG 0x40000000000000
-#define BIT_DEFAULT 0x40000000000000
-#define BIT_AVAILABLE 0x10000000000000
-#define BIT_PRESENT 0x800000000000
-#define BIT_EXPAND_DOWN 0x40000000000
-#define BIT_WRITABLE 0x20000000000
-#define BIT_ACCESSED 0x10000000000
-#define BIT_READABLE 0x20000000000
-#define BIT_CONFORMING 0x40000000000
-
-#define BIT_TYPE4 0x1000
-
-#define _descriptor(base, limit, dpl, fields) (\
-    (((long long)(base) & 0xff000000) << 32) | \
-    (((long long)(base) & 0x00ff0000) << 16) | \
-    (((long long)(base) & 0x0000ffff) << 16) | \
-    ((long long)(limit) & 0x0000ffff) | \
-    ((long long)(limit) & 0xf0000) << 32 | \
-    (long long)fields \
-) 
-
+CODE_SEL	= _selector(1, GDT_TI, PL0)
+DATA_SEL	= _selector(2, GDT_TI, PL0)
 SCRN_SEL	= _selector(3, GDT_TI, PL0)
 TSS0_SEL	= _selector(4, GDT_TI, PL0)
 LDT0_SEL	= _selector(5, GDT_TI, PL0)
@@ -40,15 +16,14 @@ LDT1_SEL	= _selector(7, GDT_TI, PL0)
 .global startup_32
 .text
 startup_32:
-	movl $0x10,%eax
+	movl DATA_SEL,%eax
 	mov %ax,%ds
-#	mov %ax,%es
 	lss init_stack,%esp
 
 # setup base fields of descriptors.
 	call setup_idt
 	call setup_gdt
-	movl $0x10,%eax		# reload all the segment registers
+	movl DATA_SEL,%eax		# reload all the segment registers
 	mov %ax,%ds		# after changing gdt. 
 	mov %ax,%es
 	mov %ax,%fs
@@ -56,17 +31,17 @@ startup_32:
 	lss init_stack,%esp
 
 # setup up timer 8253 chip.
-	movb $0x36, %al
-	movl $0x43, %edx
+	movb $(C8253_CHANNEL_0|C8253_RW|C8253_METHOD_3|C8253_BIN_COUNTER), %al
+	movl $C8253_CTL_PORT, %edx
 	outb %al, %dx
-	movl $11930, %eax        # timer frequency 100 HZ 
-	movl $0x40, %edx
+	movl $C8253_FREQUENCY_100HZ, %eax        # timer frequency 100 HZ 
+	movl $C8253_CHANNEL_0_PORT, %edx
 	outb %al, %dx
 	movb %ah, %al
 	outb %al, %dx
 
 # setup timer & system call interrupt descriptors.
-	movl $0x00080000, %eax	
+	movl $(CODE_SEL<<16), %eax	
 	movw $timer_interrupt, %ax
 	movw $0x8E00, %dx
 	movl $0x08, %ecx              # The PC default timer int.
@@ -80,12 +55,6 @@ startup_32:
 	movl %eax,(%esi) 
 	movl %edx,4(%esi)
 
-# unmask the timer interrupt.
-#	movl $0x21, %edx
-#	inb %dx, %al
-#	andb $0xfe, %al
-#	outb %al, %dx
-
 # Move to user mode (task 0)
 	pushfl
 	andl $0xffffbfff, (%esp)
@@ -96,10 +65,10 @@ startup_32:
 	lldt %ax 
 	movl $0, current
 	sti
-	pushl $0x17
+	pushl $_selector(2, LDT_TI, PL3)
 	pushl $init_stack
 	pushfl
-	pushl $0x0f
+	pushl $_selector(1, LDT_TI, PL3)
 	pushl $task0
 	iret
 
@@ -214,19 +183,40 @@ lgdt_opcode:
 idt:	.fill 256,8,0		# idt is uninitialized
 
 gdt:	.quad 0x0000000000000000	/* NULL descriptor */
-	.quad 0x00c09a00000007ff	/* 8Mb 0x08, base = 0x00000 */
-	.quad 0x00c09200000007ff	/* 8Mb 0x10 */
-	.quad 0x00c0920b80000002	/* screen 0x18 - for display */
+	.quad _descriptor( 
+        0, 0x7ff, PL0,  
+        (BIT_TYPE_EXE | BIT_READABLE | BIT_GRANULARITY | BIT_BIG | BIT_PRESENT) 
+    ) /* 8Mb 0x08, base = 0x00000 */
+	.quad _descriptor( 
+        0, 0x7ff, PL0,  
+        (BIT_TYPE_DATA | BIT_WRITABLE | BIT_GRANULARITY | BIT_BIG | BIT_PRESENT) 
+    ) /* 8Mb 0x10 */
+	.quad _descriptor(
+        0xb8000, 0x2, PL0, 
+        (BIT_TYPE_DATA | BIT_WRITABLE | BIT_GRANULARITY | BIT_BIG | BIT_PRESENT)
+    ) /* screen 0x18 - for display */
 
-	.word 0x0068, tss0, 0xe900, 0x0	# TSS0 descr 0x20
-	.word 0x0040, ldt0, 0xe200, 0x0	# LDT0 descr 0x28
-	.word 0x0068, tss1, 0xe900, 0x0	# TSS1 descr 0x30
-	.word 0x0040, ldt1, 0xe200, 0x0	# LDT1 descr 0x38
+	def_descriptor_64kbase(
+		tss0, 0x68, PL3, (BIT_386TSS|BIT_PRESENT)
+	) # .word 0x0068, tss0, 0xe900, 0x0	
+
+	def_descriptor_64kbase(
+		ldt0, 0x40, PL3, (BIT_PRESENT|BIT_TYPE_LDT)
+	) # .word 0x0040, ldt0, 0xe200, 0x0	# LDT0 descr 0x28
+	
+	def_descriptor_64kbase(
+		tss1, 0x68, PL3, (BIT_PRESENT|BIT_386TSS)
+	) # .word 0x0068, tss1, 0xe900, 0x0	# TSS1 descr 0x30
+	
+	def_descriptor_64kbase(
+		ldt1, 0x40, PL3, (BIT_PRESENT|BIT_TYPE_LDT)
+	) # .word 0x0040, ldt1, 0xe200, 0x0	# LDT1 descr 0x38
+	
 end_gdt:
 	.fill 128,4,0
 init_stack:                          # Will be used as user stack for task0.
 	.long init_stack
-	.word selector(2, GDT_TI, PL0)
+	.word _selector(2, GDT_TI, PL0)
 
 /*************************************/
 .align 8
@@ -253,7 +243,7 @@ ldt1:	.quad 0x0000000000000000
 	.quad 0x00c0f200000003ff	# 0x17
 
 tss1:	.long 0 			/* back link */
-	.long krn_stk1, selector(2, GDT_TI, PL0)		/* esp0, ss0 */
+	.long krn_stk1, _selector(2, GDT_TI, PL0)		/* esp0, ss0 */
 	.long 0, 0, 0, 0, 0		/* esp1, ss1, esp2, ss2, cr3 */
 	.long task1, 0x200		/* eip, eflags */
 	.long 0, 0, 0, 0		/* eax, ecx, edx, ebx */
