@@ -183,35 +183,36 @@ lgdt_opcode:
 idt:	.fill 256,8,0		# idt is uninitialized
 
 gdt:	.quad 0x0000000000000000	/* NULL descriptor */
-	.quad _descriptor( 
-        0, 0x7ff, PL0,  
-        (BIT_TYPE_EXE | BIT_READABLE | BIT_GRANULARITY | BIT_BIG | BIT_PRESENT) 
-    ) /* 8Mb 0x08, base = 0x00000 */
-	.quad _descriptor( 
-        0, 0x7ff, PL0,  
-        (BIT_TYPE_DATA | BIT_WRITABLE | BIT_GRANULARITY | BIT_BIG | BIT_PRESENT) 
-    ) /* 8Mb 0x10 */
-	.quad _descriptor(
+	.quad desc_code_64(
+		0, 0x7ff, PL0,
+		(DESC_CODE_R_64|DESC_G_64|DESC_CODE_D_64)
+	) /* 第 2 个是内核代码段描述符。其选择符是 0x08。8Mb */
+	.quad desc_data_64(
+		0, 0x7ff, PL0,
+		(DESC_DATA_W_64|DESC_G_64|DESC_DATA_B_64)
+	) /* 第 3 个是内核数据段描述符。其选择符是 0x10。8Mb */
+	.quad desc_data_64(
         0xb8000, 0x2, PL0, 
-        (BIT_TYPE_DATA | BIT_WRITABLE | BIT_GRANULARITY | BIT_BIG | BIT_PRESENT)
-    ) /* screen 0x18 - for display */
+        (DESC_DATA_W_64 | DESC_G_64 | DESC_DATA_B_64)
+    ) /*  第 4 个是显示内存段描述符。其选择符是 0x18。 */
 
-	def_descriptor_64kbase(
-		tss0, 0x68, PL3, (BIT_386TSS|BIT_PRESENT)
-	) # .word 0x0068, tss0, 0xe900, 0x0	
+	.word 0x68, tss0, DESC_P_16|desc_dpl_16(PL3)|DESC_SYS_386_TSS_16, 0
+	/* limit, base, fields
+		第 5 个是 TSS0 段的描述符。其选择符是 0x20 
+	*/
+	.word 0x40, ldt0, DESC_P_16|DESC_SYS_LDT_16|desc_dpl_16(PL3), 0
+	/* limit, base, fields
+		 第 6 个是 LDT0 段的描述符。其选择符是 0x28
+	*/
+	.word 0x68, tss1, DESC_P_16|desc_dpl_16(PL3)|DESC_SYS_386_TSS_16, 0
+	/* limit, base, fields
+		第 7 个是 TSS1 段的描述符。其选择符是 0x30
+	*/
+	.word 0x40, ldt1, DESC_P_16|DESC_SYS_LDT_16|desc_dpl_16(PL3), 0
+	/* limit, base, fields
+		第 8 个是 LDT1 段的描述符。其选择符是 0x38
+	*/
 
-	def_descriptor_64kbase(
-		ldt0, 0x40, PL3, (BIT_PRESENT|BIT_TYPE_LDT)
-	) # .word 0x0040, ldt0, 0xe200, 0x0	# LDT0 descr 0x28
-	
-	def_descriptor_64kbase(
-		tss1, 0x68, PL3, (BIT_PRESENT|BIT_386TSS)
-	) # .word 0x0068, tss1, 0xe900, 0x0	# TSS1 descr 0x30
-	
-	def_descriptor_64kbase(
-		ldt1, 0x40, PL3, (BIT_PRESENT|BIT_TYPE_LDT)
-	) # .word 0x0040, ldt1, 0xe200, 0x0	# LDT1 descr 0x38
-	
 end_gdt:
 	.fill 128,4,0
 init_stack:                          # Will be used as user stack for task0.
