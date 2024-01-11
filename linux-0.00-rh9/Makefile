@@ -19,7 +19,7 @@ disk: Image
 head.o: head.s
 	as --32 head.s -o head.o
 
-head.s: head.S i386.h 8253.h
+head.s: head.S i386.h bios.h
 	gcc -E head.S -o head.s
 
 system:	head.o 

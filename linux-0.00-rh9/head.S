@@ -3,7 +3,7 @@
 #  just like the Linux. The kernel code is located at 0x10000. 
 
 #include "i386.h"
-#include "8253.h"
+#include "bios.h"
 
 CODE_SEL	= _selector(1, GDT_TI, PL0)
 DATA_SEL	= _selector(2, GDT_TI, PL0)
@@ -43,13 +43,14 @@ startup_32:
 # setup timer & system call interrupt descriptors.
 	movl $(CODE_SEL<<16), %eax	
 	movw $timer_interrupt, %ax
-	movw $0x8E00, %dx
-	movl $0x08, %ecx              # The PC default timer int.
+	movw $(DESC_SYS_386_INT_GATE_16|DESC_P_16), %dx
+	movl $BIOS_INT_TIMER, %ecx              # The PC default timer int.
 	lea idt(,%ecx,8), %esi
 	movl %eax,(%esi) 
 	movl %edx,4(%esi)
+
 	movw $system_interrupt, %ax
-	movw $0xef00, %dx
+	movw $(DESC_P_16|DESC_SYS_386_TRAP_GATE_16|DESC_DPL3_16), %dx
 	movl $0x80, %ecx
 	lea idt(,%ecx,8), %esi
 	movl %eax,(%esi) 
@@ -79,9 +80,9 @@ setup_gdt:
 
 setup_idt:
 	lea ignore_int,%edx
-	movl $0x00080000,%eax
+	movl $(_selector(2, GDT_TI, PL0) << 16), %eax
 	movw %dx,%ax		/* selector = 0x0008 = cs */
-	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
+	movw $(DESC_SYS_386_INT_GATE_16|DESC_P_16),%dx	/* interrupt gate - dpl=0, present */
 	lea idt,%edi
 	mov $256,%ecx
 rp_sidt:

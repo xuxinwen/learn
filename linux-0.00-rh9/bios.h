@@ -1,4 +1,4 @@
-
+#define BIOS_INT_TIMER 0x08
 
 #define C8253_CHANNEL_0 0x00
 #define C8253_RW 0x30

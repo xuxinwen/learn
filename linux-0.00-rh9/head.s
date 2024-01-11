@@ -10,7 +10,7 @@
 
 # 1 "i386.h" 1
 # 6 "head.S" 2
-# 1 "8253.h" 1
+# 1 "bios.h" 1
 # 7 "head.S" 2
 
 CODE_SEL = ((1) << 3 | (0b000) | (0b00))
@@ -51,13 +51,14 @@ startup_32:
 # setup timer & system call interrupt descriptors.
  movl $(CODE_SEL<<16), %eax
  movw $timer_interrupt, %ax
- movw $0x8E00, %dx
+ movw $((0x0e<<8)|(0x80<<8)), %dx
  movl $0x08, %ecx # The PC default timer int.
  lea idt(,%ecx,8), %esi
  movl %eax,(%esi)
  movl %edx,4(%esi)
+
  movw $system_interrupt, %ax
- movw $0xef00, %dx
+ movw $((0x80<<8)|(0x0f<<8)|(0b11<<14)), %dx
  movl $0x80, %ecx
  lea idt(,%ecx,8), %esi
  movl %eax,(%esi)
@@ -87,9 +88,9 @@ setup_gdt:
 
 setup_idt:
  lea ignore_int,%edx
- movl $0x00080000,%eax
+ movl $(((2) << 3 | (0b000) | (0b00)) << 16), %eax
  movw %dx,%ax
- movw $0x8E00,%dx
+ movw $((0x0e<<8)|(0x80<<8)),%dx
  lea idt,%edi
  mov $256,%ecx
 rp_sidt:
