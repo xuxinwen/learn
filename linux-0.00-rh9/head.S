@@ -97,7 +97,6 @@ rp_sidt:
 write_char:
 	push %gs
 	pushl %ebx
-#	pushl %eax
 	mov $SCRN_SEL, %ebx
 	mov %bx, %gs
 	movl scr_loc, %ebx
@@ -109,7 +108,6 @@ write_char:
 	jb 1f
 	movl $0, %ebx
 1:	movl %ebx, scr_loc	
-#	popl %eax
 	popl %ebx
 	pop %gs
 	ret
@@ -196,19 +194,19 @@ gdt:	.quad 0x0000000000000000	/* NULL descriptor */
         (DESC_DATA_W_64 | DESC_G_64 | DESC_DATA_B_64)
     ) /*  第 4 个是显示内存段描述符。其选择符是 0x18。 */
 
-	.word 0x68, tss0, DESC_P_16|desc_dpl_16(PL3)|DESC_SYS_386_TSS_16, 0
+	.word 0x68, tss0, DESC_SYS_386_TSS_16|DESC_DPL3_16|DESC_P_16, 0
 	/* limit, base, fields
 		第 5 个是 TSS0 段的描述符。其选择符是 0x20 
 	*/
-	.word 0x40, ldt0, DESC_P_16|DESC_SYS_LDT_16|desc_dpl_16(PL3), 0
+	.word 0x40, ldt0, DESC_SYS_LDT_16|DESC_DPL3_16|DESC_P_16, 0
 	/* limit, base, fields
 		 第 6 个是 LDT0 段的描述符。其选择符是 0x28
 	*/
-	.word 0x68, tss1, DESC_P_16|desc_dpl_16(PL3)|DESC_SYS_386_TSS_16, 0
+	.word 0x68, tss1, DESC_SYS_386_TSS_16|DESC_DPL3_16|DESC_P_16, 0
 	/* limit, base, fields
 		第 7 个是 TSS1 段的描述符。其选择符是 0x30
 	*/
-	.word 0x40, ldt1, DESC_P_16|DESC_SYS_LDT_16|desc_dpl_16(PL3), 0
+	.word 0x40, ldt1, DESC_SYS_LDT_16|DESC_DPL3_16|DESC_P_16, 0
 	/* limit, base, fields
 		第 8 个是 LDT1 段的描述符。其选择符是 0x38
 	*/
@@ -222,11 +220,15 @@ init_stack:                          # Will be used as user stack for task0.
 /*************************************/
 .align 8
 ldt0:	.quad 0x0000000000000000
-	.quad 0x00c0fa00000003ff	# 0x0f, base = 0x00000
-	.quad 0x00c0f200000003ff	# 0x17
+	.quad desc_code_64(
+		0, 0x3ff, PL3, (DESC_CODE_R_64|DESC_G_64|DESC_CODE_D_64)
+	)
+	.quad desc_data_64(
+		0, 0x3ff, PL3, (DESC_DATA_W_64|DESC_G_64|DESC_DATA_B_64)
+	)
 
 tss0:	.long 0 			/* back link */
-	.long krn_stk0, 0x10		/* esp0, ss0 */
+	.long krn_stk0, _selector(2, GDT_TI, PL0) /* esp0, ss0 */
 	.long 0, 0, 0, 0, 0		/* esp1, ss1, esp2, ss2, cr3 */
 	.long 0, 0, 0, 0, 0		/* eip, eflags, eax, ecx, edx */
 	.long 0, 0, 0, 0, 0		/* ebx esp, ebp, esi, edi */
@@ -235,13 +237,16 @@ tss0:	.long 0 			/* back link */
 
 	.fill 128,4,0
 krn_stk0:
-#	.long 0
 
 /************************************/
 .align 8
 ldt1:	.quad 0x0000000000000000
-	.quad 0x00c0fa00000003ff	# 0x0f, base = 0x00000
-	.quad 0x00c0f200000003ff	# 0x17
+	.quad desc_code_64(
+		0, 0x3ff, PL3, (DESC_CODE_R_64|DESC_G_64|DESC_CODE_D_64)
+	)
+	.quad desc_data_64(
+		0, 0x3ff, PL3, (DESC_DATA_W_64|DESC_G_64|DESC_DATA_B_64)
+	)
 
 tss1:	.long 0 			/* back link */
 	.long krn_stk1, _selector(2, GDT_TI, PL0)		/* esp0, ss0 */
@@ -249,7 +254,10 @@ tss1:	.long 0 			/* back link */
 	.long task1, 0x200		/* eip, eflags */
 	.long 0, 0, 0, 0		/* eax, ecx, edx, ebx */
 	.long usr_stk1, 0, 0, 0		/* esp, ebp, esi, edi */
-	.long 0x17,0x0f,0x17,0x17,0x17,0x17 /* es, cs, ss, ds, fs, gs */
+	.long _selector(2, LDT_TI, PL3),_selector(1, LDT_TI, PL3),\
+			_selector(2, LDT_TI, PL3),_selector(2, LDT_TI, PL3),\
+			_selector(2, LDT_TI, PL3),_selector(2, LDT_TI, PL3)
+			 /* es, cs, ss, ds, fs, gs */
 	.long LDT1_SEL, 0x8000000	/* ldt, trace bitmap */
 
 	.fill 128,4,0

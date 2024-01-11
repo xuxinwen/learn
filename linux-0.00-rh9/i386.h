@@ -94,7 +94,7 @@
 #define DESC_SYS_LDT_8 0x02
 #define DESC_SYS_LDT_16 (DESC_SYS_LDT_8<<8)
 
-#define desc_dpl_16(dpl) ((dpl)<<14)
+#define DESC_DPL3_16 (PL3<<14)
 
 #define desc_64(base, limit, dpl, fields) (\
     ((LONG_LONG(base) & 0xff000000) << 32) | \
@@ -105,23 +105,8 @@
     LONG_LONG(fields) \
 )
 
-#define desc_data_64(base, limit, dpl, fields) (\
-    ((LONG_LONG(base) & 0xff000000) << 32) | \
-    ((LONG_LONG(base) & 0x00ff0000) << 16) | \
-    ((LONG_LONG(base) & 0x0000ffff) << 16) | \
-    (LONG_LONG(limit) & 0x0000ffff) | \
-    (LONG_LONG(limit) & 0xf0000) << 32 | \
-    LONG_LONG(fields|DESC_DATA_64|DESC_P_64) \
-)
-
-#define desc_code_64(base, limit, dpl, fields) (\
-    ((LONG_LONG(base) & 0xff000000) << 32) | \
-    ((LONG_LONG(base) & 0x00ff0000) << 16) | \
-    ((LONG_LONG(base) & 0x0000ffff) << 16) | \
-    (LONG_LONG(limit) & 0x0000ffff) | \
-    (LONG_LONG(limit) & 0xf0000) << 32 | \
-    LONG_LONG(fields|DESC_CODE_64|DESC_P_64) \
-)
+#define desc_data_64(base, limit, dpl, fields) desc_64(base, limit, dpl, fields|DESC_DATA_64|DESC_P_64)
+#define desc_code_64(base, limit, dpl, fields) desc_64(base, limit, dpl, fields|DESC_CODE_64|DESC_P_64)
 
 #define def_desc_64kbase(base, limit, dpl, fields) \
     .word (LONG_LONG (limit) & 0x0000ffff), \
