@@ -242,7 +242,7 @@ tss0: .long 0
  .long 0, 0, 0, 0, 0
  .long 0, 0, 0, 0, 0
  .long 0, 0, 0, 0, 0, 0
- .long LDT0_SEL, 0x8000000
+ .long ((5) << 3 | (0b000) | (0b00)), 0x8000000
 
  .fill 128,4,0
 krn_stk0:
@@ -274,7 +274,7 @@ krn_stk1:
 
 
 task0:
- movl $0x17, %eax
+ movl $((2) << 3 | (0b100) | (0b11)), %eax
  movw %ax, %ds
  movb $65, %al
  int $0x80
@@ -283,7 +283,7 @@ task0:
  jmp task0
 
 task1:
- movl $0x17, %eax
+ movl $((2) << 3 | (0b100) | (0b11)), %eax
  movw %ax, %ds
  movb $66, %al
  int $0x80

@@ -16,14 +16,14 @@ LDT1_SEL	= _selector(7, GDT_TI, PL0)
 .global startup_32
 .text
 startup_32:
-	movl DATA_SEL,%eax
+	movl _selector(2, GDT_TI, PL0),%eax
 	mov %ax,%ds
 	lss init_stack,%esp
 
 # setup base fields of descriptors.
 	call setup_idt
 	call setup_gdt
-	movl DATA_SEL,%eax		# reload all the segment registers
+	movl _selector(2, GDT_TI, PL0),%eax		# reload all the segment registers
 	mov %ax,%ds		# after changing gdt. 
 	mov %ax,%es
 	mov %ax,%fs
@@ -41,7 +41,7 @@ startup_32:
 	outb %al, %dx
 
 # setup timer & system call interrupt descriptors.
-	movl $(CODE_SEL<<16), %eax	
+	movl $(_selector(1, GDT_TI, PL0)<<16), %eax	
 	movw $timer_interrupt, %ax
 	movw $(DESC_SYS_386_INT_GATE_16|DESC_P_16), %dx
 	movl $BIOS_INT_TIMER, %ecx              # The PC default timer int.
@@ -132,7 +132,7 @@ ignore_int:
 timer_interrupt:
 	push %ds
 	pushl %eax
-	movl $0x10, %eax
+	movl $_selector(2, GDT_TI, PL0), %eax
 	mov %ax, %ds
 	movb $0x20, %al
 	outb %al, $0x20
@@ -234,7 +234,7 @@ tss0:	.long 0 			/* back link */
 	.long 0, 0, 0, 0, 0		/* eip, eflags, eax, ecx, edx */
 	.long 0, 0, 0, 0, 0		/* ebx esp, ebp, esi, edi */
 	.long 0, 0, 0, 0, 0, 0 		/* es, cs, ss, ds, fs, gs */
-	.long LDT0_SEL, 0x8000000	/* ldt, trace bitmap */
+	.long _selector(5, GDT_TI, PL0), 0x8000000	/* ldt, trace bitmap */
 
 	.fill 128,4,0
 krn_stk0:
@@ -266,7 +266,7 @@ krn_stk1:
 
 /************************************/
 task0:
-	movl $0x17, %eax
+	movl $_selector(2, LDT_TI, PL3), %eax
 	movw %ax, %ds
 	movb $65, %al              /* print 'A' */
 	int $0x80
@@ -275,7 +275,7 @@ task0:
 	jmp task0 
 
 task1:
-	movl $0x17, %eax
+	movl $_selector(2, LDT_TI, PL3), %eax
 	movw %ax, %ds
 	movb $66, %al              /* print 'B' */
 	int $0x80
